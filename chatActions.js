@@ -1,101 +1,107 @@
-import { child, get, getDatabase, push, ref, remove, set, update } from "firebase/database";
-import { getFirebaseApp } from "../firebaseHelper";
+import { getFirebaseApp } from '../firebaseHelper';
+import { ref,child,push,getDatabase, update, get, set, remove } from 'firebase/database';
 
-export const createChat = async (loggedInUserId, chatData) => {
+export const createChat = async (loggedInUserId,chatData)=>{
 
-    const newChatData = {
-        ...chatData,
-        createdBy: loggedInUserId,
-        updatedBy: loggedInUserId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
+	const newChatData = {
+		...chatData,
+		createdBy: loggedInUserId,
+		updatedBy:loggedInUserId,
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	}
 
-    const app = getFirebaseApp();
-    const dbRef = ref(getDatabase(app));
-    const newChat = await push(child(dbRef, 'chats'), newChatData);
+	const app = getFirebaseApp();
+	const dbRef = ref(getDatabase(app));
+	const newChat = await push(child(dbRef,'chats'),newChatData);
+	const chatUsers = newChatData.users;
+	for (let i = 0; i < chatUsers.length; i++) {
+		const userId = chatUsers[i];
+		await push(child(dbRef,`userChats/${userId}`),newChat.key);
+	}
 
-    const chatUsers = newChatData.users;
-    for (let i = 0; i < chatUsers.length; i++) {
-        const userId = chatUsers[i];
-        await push(child(dbRef, `userChats/${userId}`), newChat.key);
-    }
-
-    return newChat.key;
+	return newChat.key;
 }
 
-export const sendTextMessage = async (chatId, senderId, messageText, replyTo) => {
-    await sendMessage(chatId, senderId, messageText, null, replyTo);
+export const sendTextMessage = async (chatId,senderId,messageText, replyTo)=>{
+
+	await sendMessage(chatId,senderId,messageText,null,replyTo);	
 }
 
-export const sendImage = async (chatId, senderId, imageUrl, replyTo) => {
-    await sendMessage(chatId, senderId, 'Image', imageUrl, replyTo);
+export const sendImage = async (chatId,senderId,imageUrl, replyTo)=>{
+
+	await sendMessage(chatId,senderId,'Image',imageUrl,replyTo);	
 }
 
-export const updateChatData = async (chatId, userId, chatData) => {
-    const app = getFirebaseApp();
-    const dbRef = ref(getDatabase(app));
-    const chatRef = child(dbRef, `chats/${chatId}`);
+export const updateChatData = async (chatId, userId, chatData)=>{
+		const app = getFirebaseApp();
+		const dbRef = ref(getDatabase(app));
+		const chatRef = child(dbRef,`chats/${chatId}`);
 
-    await update(chatRef, {
-        ...chatData,
-        updatedAt: new Date().toISOString(),
-        updatedBy: userId
-    })
+		await update(chatRef,{
+			...chatData,
+			updatedAt:new Date().toISOString(),
+			updatedBy:userId
+		})
+		
 }
 
-const sendMessage = async (chatId, senderId, messageText, imageUrl, replyTo) => {
-    const app = getFirebaseApp();
-    const dbRef = ref(getDatabase());
-    const messagesRef = child(dbRef, `messages/${chatId}`);
 
-    const messageData = {
-        sentBy: senderId,
-        sentAt: new Date().toISOString(),
-        text: messageText
-    };
+export const sendMessage = async (chatId,senderId,messageText,imageUrl, replyTo)=>{
 
-    if (replyTo) {
-        messageData.replyTo = replyTo;
-    }
+	const app = getFirebaseApp();
+	const dbRef = ref(getDatabase(app));
+	const messageRef = child(dbRef,`messages/${chatId}`);
 
-    if (imageUrl) {
-        messageData.imageUrl = imageUrl;
-    }
+	const messageData = {
+		sentBy : senderId,
+		sentAt : new Date().toISOString(),
+		text : messageText
+	}
 
-    await push(messagesRef, messageData);
+	if(replyTo){
+		messageData.replyTo = replyTo;
+	}
 
-    const chatRef = child(dbRef, `chats/${chatId}`);
-    await update(chatRef, {
-        updatedBy: senderId,
-        updatedAt: new Date().toISOString(),
-        latestMessageText: messageText
-    });
+	if(imageUrl){
+		messageData.imageUrl = imageUrl;
+	}
+
+	await push(messageRef,messageData);
+
+	const chatRef = child(dbRef,`chats/${chatId}`);
+	await update(chatRef,{
+		updatedBy: senderId,
+		updatedAt: new Date().toISOString(),
+		latestMessageText: messageText
+	});
 }
 
-export const starMessage = async (messageId, chatId, userId) => {
-    try {
-        const app = getFirebaseApp();
-        const dbRef = ref(getDatabase(app));
-        const childRef = child(dbRef, `userStarredMessages/${userId}/${chatId}/${messageId}`);
 
-        const snapshot = await get(childRef);
+export const starMessage= async (messageId,chatId,userId)=>{
 
-        if (snapshot.exists()) {
-            // Starred item exists - Un-star
-            await remove(childRef);
-        }
-        else {
-            // Starred item does not exist - star
-            const starredMessageData = {
-                messageId,
-                chatId,
-                starredAt: new Date().toISOString()
-            }
+try {
+	const app = getFirebaseApp();
+	const dbRef = ref(getDatabase(app));
+	const childRef = child(dbRef,`userStarredMessages/${userId}/${chatId}/${messageId}`);
 
-            await set(childRef, starredMessageData);
-        }
-    } catch (error) {
-        console.log(error);        
-    }
+	const snapShot = await get(childRef);
+
+		if(snapShot.exists()){
+			//unstar
+			await remove(childRef);
+		}
+		else{
+			const starredMessage = {
+				messageId,
+				chatId,
+				starredAt:new Date().toISOString()
+			}	
+
+			await set(childRef,starredMessage);
+		}
+		
+	} catch (error) {
+		console.log(error);	
+	}
 }
